@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart';
 
 class CustomVideoPlayer extends StatefulWidget {
   final XFile video;
+
   const CustomVideoPlayer({
     required this.video,
     Key? key,
@@ -33,12 +34,21 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
 
     await videoController!.initialize();
 
-    setState((){});
+    //슬라이더가 움직일 때(값이 변경될 때)를 위한 르스너(영상 재생시)
+    videoController!.addListener(() async {
+      final currentPosition = videoController!.value.position;
+
+      setState(() {
+        this.currentPosition = currentPosition;
+      });
+    });
+
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    if(videoController == null) {
+    if (videoController == null) {
       return CircularProgressIndicator();
     }
     return AspectRatio(
@@ -46,7 +56,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       child: Stack(
         children: [
           VideoPlayer(
-              videoController!,
+            videoController!,
           ),
           _Controlls(
             onReversePressed: onReversePressed,
@@ -57,31 +67,23 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
           _NewVideo(
             onPressed: onNewVideoPressed,
           ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            left: 0,
-            child: Slider(
-              value: currentPosition.inSeconds.toDouble(),
-              onChanged: (double val) {
-                setState(() {
-                  currentPosition = Duration(seconds: val.toInt());
-                });
-               },
-
-              max: videoController!.value.duration.inSeconds.toDouble(),
-              min: 0,
-
-            ),
+          _SilderBottom(
+              currentPosition: currentPosition,
+              maxPosition: videoController!.value.duration,
+              onSliderChanged: onSliderChanged
           ),
         ],
       ),
     );
   }
 
-  void onNewVideoPressed(){
-
+  void onSliderChanged(double val) {
+    videoController!.seekTo(
+      Duration(seconds: val.toInt()),
+    );
   }
+
+  void onNewVideoPressed() {}
 
   void onReversePressed() {
     // 영상의 현재 포지션
@@ -90,21 +92,21 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     // 영상 처음 부분(0초)를 나타냄
     Duration position = Duration();
 
-    if(currentPosition.inSeconds > 3) {
+    if (currentPosition.inSeconds > 3) {
       position = currentPosition - Duration(seconds: 3);
     }
 
     videoController!.seekTo(position);
-
   }
 
-  void onForwardPressed(){
+  void onForwardPressed() {
     // 영상의 전체 길이를 나타냄
     final maxPosition = videoController!.value.duration;
     final currentPosition = videoController!.value.position;
     Duration position = maxPosition;
 
-    if((maxPosition -Duration(seconds: 3)).inSeconds > currentPosition.inSeconds) {
+    if ((maxPosition - Duration(seconds: 3)).inSeconds >
+        currentPosition.inSeconds) {
       position = currentPosition + Duration(seconds: 3);
     }
 
@@ -112,33 +114,30 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   }
 
   void onPlayPressed() {
-    
     // 실행중인지 아닌지 값을 받아오지만 setState를 통해 다시 빌드를 해야함
-    setState(() {
-      
-    });
+    setState(() {});
     // 이미 실행중이면 중지
-    if(videoController!.value.isPlaying){
+    if (videoController!.value.isPlaying) {
       videoController!.pause();
-    } else { // 실행 중이 아니면 재생
+    } else {
+      // 실행 중이 아니면 재생
       videoController!.play();
     }
   } // onPlayPressed()
 }
 
 class _Controlls extends StatelessWidget {
-
   final VoidCallback onPlayPressed;
   final VoidCallback onReversePressed;
   final VoidCallback onForwardPressed;
   final bool isPlaying;
 
-  const _Controlls({
-    required this.onPlayPressed,
-    required this.onReversePressed,
-    required this.onForwardPressed,
-    required this.isPlaying,
-    Key? key})
+  const _Controlls(
+      {required this.onPlayPressed,
+      required this.onReversePressed,
+      required this.onForwardPressed,
+      required this.isPlaying,
+      Key? key})
       : super(key: key);
 
   @override
@@ -147,7 +146,7 @@ class _Controlls extends StatelessWidget {
       color: Colors.black.withOpacity(0.5),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment:  MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           renderIconButton(
             onPressed: onReversePressed,
@@ -169,7 +168,7 @@ class _Controlls extends StatelessWidget {
   Widget renderIconButton({
     required VoidCallback onPressed,
     required IconData iconData,
-}) {
+  }) {
     return IconButton(
       onPressed: onPressed,
       iconSize: 30.0,
@@ -183,11 +182,8 @@ class _Controlls extends StatelessWidget {
 
 class _NewVideo extends StatelessWidget {
   final VoidCallback onPressed;
-  const _NewVideo({
-    required this.onPressed,
-    Key? key
-  }) :
-        super(key: key);
+
+  const _NewVideo({required this.onPressed, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -197,11 +193,58 @@ class _NewVideo extends StatelessWidget {
           onPressed: onPressed,
           color: Colors.white,
           iconSize: 30.0,
-          icon: Icon(
-              Icons.photo_camera_back
-          )
-      ),
+          icon: Icon(Icons.photo_camera_back)),
     );
   }
 }
 
+class _SilderBottom extends StatelessWidget {
+  final Duration currentPosition;
+  final Duration maxPosition;
+  final ValueChanged<double> onSliderChanged;
+
+  const _SilderBottom({
+    required this.currentPosition,
+    required this.maxPosition,
+    required this.onSliderChanged,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      bottom: 0,
+      right: 0,
+      left: 0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: Row(
+          children: [
+            // 슬라이드 바의 현재 위치를 나타내는 것
+            Text(
+              '${(currentPosition.inMinutes % 60).toString().padLeft(2, '0')} : ${(currentPosition.inSeconds % 60).toString().padLeft(2, '0')}',
+              style: TextStyle(
+                color: Colors.white,
+              ),
+            ),
+            Expanded(
+              child: Slider(
+                value: currentPosition.inSeconds.toDouble(),
+                onChanged: onSliderChanged,
+                max: maxPosition.inSeconds.toDouble(),
+                min: 0,
+              ),
+            ),
+            Text(
+              // 슬라이드 바의 전체 길이를 나타내는 것
+              '${(maxPosition.inMinutes % 60).toString().padLeft(2, '0')} : ${(maxPosition.inSeconds % 60).toString().padLeft(2, '0')}',
+              style: TextStyle(
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
