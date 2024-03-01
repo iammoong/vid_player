@@ -6,9 +6,11 @@ import 'package:video_player/video_player.dart';
 
 class CustomVideoPlayer extends StatefulWidget {
   final XFile video;
+  final VoidCallback onNewVideoPressed;
 
   const CustomVideoPlayer({
     required this.video,
+    required this.onNewVideoPressed,
     Key? key,
   }) : super(key: key);
 
@@ -19,15 +21,30 @@ class CustomVideoPlayer extends StatefulWidget {
 class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   VideoPlayerController? videoController;
   Duration currentPosition = Duration();
+  bool showControls = false;
 
+  // initializeController()는 처음 기동 후 한 번만 실행 됨.
   @override
   void initState() {
     super.initState();
 
     initializeController();
   }
+  @override
+  void didUpdateWidget(covariant CustomVideoPlayer oldWidget){
+    super.didUpdateWidget(oldWidget);
+
+    // 만약 지금 선택한 비디오가 이전에 선택한 이미지가 다르다면
+    //initializeController()를 다시 실행하라
+    if(oldWidget.video.path != widget.video.path){
+      initializeController();
+    }
+  }
 
   initializeController() async {
+    // 재생 시간 리셋
+    currentPosition = Duration();
+
     videoController = VideoPlayerController.file(
       File(widget.video.path),
     );
@@ -53,26 +70,35 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     }
     return AspectRatio(
       aspectRatio: videoController!.value.aspectRatio,
-      child: Stack(
-        children: [
-          VideoPlayer(
-            videoController!,
-          ),
-          _Controlls(
-            onReversePressed: onReversePressed,
-            onPlayPressed: onPlayPressed,
-            onForwardPressed: onForwardPressed,
-            isPlaying: videoController!.value.isPlaying,
-          ),
-          _NewVideo(
-            onPressed: onNewVideoPressed,
-          ),
-          _SilderBottom(
-              currentPosition: currentPosition,
-              maxPosition: videoController!.value.duration,
-              onSliderChanged: onSliderChanged
-          ),
-        ],
+      child: GestureDetector(
+        onTap: (){
+          setState(() {
+            showControls = !showControls;
+          });
+        },
+        child: Stack(
+          children: [
+            VideoPlayer(
+              videoController!,
+            ),
+            if(showControls)
+              _Controlls(
+                onReversePressed: onReversePressed,
+                onPlayPressed: onPlayPressed,
+                onForwardPressed: onForwardPressed,
+                isPlaying: videoController!.value.isPlaying,
+              ),
+            if(showControls)
+              _NewVideo(
+                onPressed: widget.onNewVideoPressed,
+              ),
+            _SilderBottom(
+                currentPosition: currentPosition,
+                maxPosition: videoController!.value.duration,
+                onSliderChanged: onSliderChanged
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -83,7 +109,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     );
   }
 
-  void onNewVideoPressed() {}
+
 
   void onReversePressed() {
     // 영상의 현재 포지션
@@ -144,8 +170,8 @@ class _Controlls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.black.withOpacity(0.5),
+      height: MediaQuery.of(context).size.height,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           renderIconButton(
